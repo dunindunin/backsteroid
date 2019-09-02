@@ -1,204 +1,254 @@
-"use strict";
-
-/**
- * User sessions
- * @param {Array} users
- */
+let interval = null;
 const users = [];
+const nbMaxHigh = 99;
+const heroku = typeof process !== "undefined";
+let client;
 
-/**
- * Find opponent for a user
- * @param {User} user
- */
-function findOpponent(user) {
-	for (let i = 0; i < users.length; i++) {
-		if (
-			user !== users[i] &&
-			users[i].opponent === null
-		) {
-			new Game(user, users[i]).start();
-		}
-	}
+if(heroku) {
+	const { Client } = require('pg');
+
+	client = new Client({
+	  connectionString: process.env.DATABASE_URL,
+	  ssl: true,
+	});
 }
 
-/**
- * Remove user session
- * @param {User} user
- */
-function removeUser(user) {
-	users.splice(users.indexOf(user), 1);
+function test() {
+	checkHighscores([{newHighscore:true,name:generateID().slice(0,5),highscore:Math.floor(Math.random()*100000)}]);
 }
 
-/**
- * Game class
- */
-class Game {
 
-	/**
-	 * @param {User} user1 
-	 * @param {User} user2 
-	 */
-	constructor(user1, user2) {
-		this.user1 = user1;
-		this.user2 = user2;
-	}
+// for(var i=0;i<100;i++) {
+	test();
+// }
+console.log("storage.size()",storage.size());
+console.log("heroku",heroku);
 
-	/**
-	 * Start new game
-	 */
-	start() {
-		this.user1.start(this, this.user2);
-		this.user2.start(this, this.user1);
-	}
-
-	/**
-	 * Is game ended
-	 * @return {boolean}
-	 */
-	ended() {
-		return this.user1.guess !== GUESS_NO && this.user2.guess !== GUESS_NO;
-	}
-
-	/**
-	 * Final score
-	 */
-	score() {
-		if (
-			this.user1.guess === GUESS_ROCK && this.user2.guess === GUESS_SCISSORS ||
-			this.user1.guess === GUESS_PAPER && this.user2.guess === GUESS_ROCK ||
-			this.user1.guess === GUESS_SCISSORS && this.user2.guess === GUESS_PAPER
-		) {
-			this.user1.win();
-			this.user2.lose();
-		} else if (
-			this.user2.guess === GUESS_ROCK && this.user1.guess === GUESS_SCISSORS ||
-			this.user2.guess === GUESS_PAPER && this.user1.guess === GUESS_ROCK ||
-			this.user2.guess === GUESS_SCISSORS && this.user1.guess === GUESS_PAPER
-		) {
-			this.user2.win();
-			this.user1.lose();
-		} else {
-			this.user1.draw();
-			this.user2.draw();
-		}
-	}
-
-}
-
-/**
- * User session class
- */
-class User {
-
-	/**
-	 * @param {Socket} socket
-	 */
-	constructor(socket) {
-		this.socket = socket;
-		this.game = null;
-		this.opponent = null;
-		this.guess = GUESS_NO;
-	}
-
-	/**
-	 * Set guess value
-	 * @param {number} guess
-	 */
-	setGuess(guess) {
-		if (
-			!this.opponent ||
-			guess <= GUESS_NO ||
-			guess > GUESS_SCISSORS
-		) {
-			return false;
-		}
-		this.guess = guess;
-		return true;
-	}
-
-	/**
-	 * Start new game
-	 * @param {Game} game
-	 * @param {User} opponent
-	 */
-	start(game, opponent) {
-		this.game = game;
-		this.opponent = opponent;
-		this.guess = GUESS_NO;
-		this.socket.emit("start");
-	}
-
-	/**
-	 * Terminate game
-	 */
-	end() {
-		this.game = null;
-		this.opponent = null;
-		this.guess = GUESS_NO;
-		this.socket.emit("end");
-	}
-
-	/**
-	 * Trigger win event
-	 */
-	win() {
-		this.socket.emit("win", this.opponent.guess);
-	}
-
-	/**
-	 * Trigger lose event
-	 */
-	lose() {
-		this.socket.emit("lose", this.opponent.guess);
-	}
-
-	/**
-	 * Trigger draw event
-	 */
-	draw() {
-		this.socket.emit("draw", this.opponent.guess);
-	}
-
-}
-
-/**
- * Socket.IO on connect event
- * @param {Socket} socket
- */
 module.exports = {
 
 	io: (socket) => {
-		const user = new User(socket);
-		users.push(user);
-		findOpponent(user);
+		users.push(socket.id);
 
+		socket.on("start", (data) => {
+			console.log(users.length);
+			if(users.length==1) {
+				console.log("first user");
+				startGame(socket);
+			}
+			var s = createShip(socket.id,data.name,data.highscoreID);
+			// placeShip(s);
+			ships.push(s);
+			socket.emit("ready",socket.id);
+		});
 		socket.on("disconnect", () => {
-			console.log("Disconnected: " + socket.id);
-			removeUser(user);
-			if (user.opponent) {
-				user.opponent.end();
-				findOpponent(user.opponent);
+			users.splice(users.indexOf(socket.id), 1);
+			ships.splice(ships.indexOf(getShip(socket.id)),1);
+			if(users.length==0) {
+				console.log("no user");
+				endGame(socket);
 			}
 		});
 
-		socket.on("guess", (guess) => {
-			console.log("Guess: " + socket.id);
-			if (user.setGuess(guess) && user.game.ended()) {
-				user.game.score();
-				user.game.start();
-				storage.get('games', 0).then(games => {
-					storage.set('games', games + 1);
-				});
+		socket.on("revive",()=>{
+			console.log("revive",socket.id)
+			let ship = getShip(socket.id);
+			if(ship) {
+				ship.score = ship.newHighscore = 0;
+				placeShip(ship);
 			}
 		});
+
+		socket.on("ship",(data)=>{
+			let ship = getShip(socket.id);
+			ship.left = data.left;
+			ship.right = data.right;
+			ship.fire = data.fire;
+			ship.teleport = data.teleport;
+		});
+
+		// socket.on("leaderBoard",()=>{
+		// 	getLeaderBoard().then((res)=>{
+		// 		socket.emit("leaderBoard",res);
+		// 	})
+			
+		// });
 
 		console.log("Connected: " + socket.id);
+		socket.emit("id",socket.id);
 	},
 
-	stat: (req, res) => {
-		storage.get('games', 0).then(games => {
-			res.send(`<h1>Games played: ${games}</h1>`);
+	leaderBoard: (req, res) => {
+		getLeaderBoard().then((leadB)=>{
+			res.setHeader('Content-Type', 'application/json');
+    		res.end(JSON.stringify(leadB));
 		});
 	}
 
 };
+
+function startGame(socket) {
+	if(interval) return;
+	asts = [];
+	bulls = [];
+	ships = [];
+	interval = setInterval(function(){
+		checkHighscores(logicLoop());
+		io.volatile.emit("loop",{asts:asts,esth:esth,ships:ships,bulls:bulls});
+	},frameRate);
+
+	console.log("setInterval : "+interval);
+}
+
+function endGame() {
+	if(interval===null) return;
+	console.log("clearInterval : "+interval);
+	clearInterval(interval);
+	interval = null;
+}
+
+function checkHighscores(deadShips) {
+	deadShips.forEach((el)=>{
+		if (el.newHighscore) {
+			console.log("new highscore");
+			try{
+				getSavedHigh(el.highscoreID).then((high)=>{
+					if(el.highscore>high) saveHigh(el);
+				})
+				
+			}catch(e){console.log("highscore error",e);}
+		}
+	});
+}
+
+async function getSavedHigh(id) {
+	console.log("	getSavedHigh",id);
+	let saved=null;
+	if(id) {
+		if(heroku) {
+			// postgres
+			await client.connect()
+			const res = await client.query('SELECT score FROM highscoreTab WHERE highscoreID = $1', [id]);
+			saved = res.rows.length? res.rows.score : null;
+			await client.end()
+		} else {
+			// sqlite
+			saved = await storage.get(id,null);
+			if(saved) saved = saved.score;
+		}
+	}
+	console.log("		"+JSON.stringify(saved));
+	return saved;
+}
+
+async function saveHigh(ship) {
+	console.log("	save highscore");
+	if(ship.highscoreID) await removeHigh(ship.highscoreID);
+
+	let newID;
+	do {
+		newID = generateID();
+	} while(await getSavedHigh(newID) !== null)
+
+	console.log ("		newID",newID);
+
+	if(heroku) {
+		// postgres
+		await client.connect()
+		await client.query('INSERT INTO highscoreTab(highscoreID,name,score) VALUES($1,$2,$3)', [newID,ship.name,ship.highscore]);
+		await client.end();
+	} else {
+		// sqlite
+		console.log ("			sqlite save");
+		try{
+			saved = await storage.set(newID,{"name":ship.name,"score":ship.highscore});
+		} catch(e) {console.log("set error",e)};
+		ship.highscoreID = newID;
+	}
+	io.to(ship.id).emit("highscoreID",newID);
+	console.log ("			end sqlite save");
+
+	checkNbHigh();
+
+	storage.length().then((res)=>console.log);
+}
+
+async function removeHigh(id) {
+	console.log("remove id",id);
+	try{
+		if(heroku) {
+			// postgres
+			await client.connect();
+			await client.query('DELETE FROM highscoreTab WHERE highscoreID = $1', [id]);
+			await client.end();
+		} else {
+			// sqlite
+				await storage.remove(id);
+		}
+	} catch(e) {console.log("remove error",e)};
+}
+
+function generateID() {
+	let gid="";
+	for(var i=0;i<8;i++) gid += String.fromCharCode(65+rand(0,26));
+		return gid;
+}
+
+async function checkNbHigh() {
+	console.log("		checkNbHigh");
+	if(heroku) {
+		// postgres
+		await client.connect();
+		let length = await client.query('SELECT COUNT(*) FROM highscoreTab');
+		length = length.row[0].count;
+		while (length>nbMaxHigh) {
+			await client.query('DELETE FROM highscoreTab WHERE score = (SELECT MIN(score) FROM highscoreTab )');
+			length = await client.query('SELECT COUNT(*) FROM highscoreTab');
+			length = length.row[0].count;
+		}
+		await client.end();
+	} else {
+		// sqlite
+		storage.length().then(async (length)=>{
+			console.log("			storage length",length)
+			while(length>nbMaxHigh) {
+				let minKey, minValue,score;
+				for(var i=0;i<length;i++) {
+					score = await storage.get(await storage.key(i));
+					// console.log("i",i,"await storage.key(i)",await storage.key(i),"score",score);
+					if(minValue == undefined || minValue>score.score) {
+						minValue = score.score;
+						minKey = await storage.key(i);
+					}
+				}
+
+				await removeHigh(minKey);
+				length = await storage.length();
+			}
+		})
+	}
+}
+
+
+async function getLeaderBoard() {
+	let res;
+	if(heroku) {
+		// postgres
+		await client.connect();
+		res = await client.query('SELECT * FROM highscoreTab');
+		await client.end();
+	} else {
+		// sqlite
+		res=[];
+		let el,key,length = await storage.length();
+		for(var i=0;i<length;i++) {
+			key = await storage.key(i);
+			el = await storage.get(key);
+			el.highscoreID = key;
+			res.push(el);
+		}
+		
+	}
+	return res.sort((s1,s2)=>{
+			return s2.score - s1.score;
+		});
+}

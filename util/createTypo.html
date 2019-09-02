@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Convert points</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #converted, canvas {
+            border: solid 1px lightgrey;
+            height: 300px;
+        }
+        #converted {
+            width:300px;
+            height: 300px;
+        }
+        canvas {
+            margin: 0 20px;
+        }
+        #menu {
+            height: 300px;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+        button {
+            display: block;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <button type="button" onclick="undo()">Undo</button>  
+        <button type="button" onclick="reset()">Reset</button> 
+        
+           
+    </div>
+    <canvas id="points" width="300" height="300"></canvas>
+    <div id="converted"></div>
+
+    <script>
+        var canvas = document.getElementById("points");
+        var ctx = canvas.getContext("2d");
+        var pts=[];
+        var lastPt;
+        var w4 = canvas.width/4;
+
+        function drawPts() {
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+
+            
+            for(var i=0;i<4;i++) {
+                for(var j=0;j<4;j++) {
+                    ctx.fillRect(w4/2+i*w4-1,w4/2+j*w4-1,2,2);
+                }
+            }
+
+            if(pts.length>1) {
+                ctx.beginPath();
+                ctx.moveTo(w4/2+pts[0].x*w4,w4/2+pts[0].y*w4);
+                for (var i=1;i<pts.length;i++) ctx.lineTo(w4/2+pts[i].x*w4,w4/2+pts[i].y*w4);
+                ctx.stroke();
+            }
+            
+            if(lastPt) ctx.fillRect(w4/2+lastPt.x*w4-2,w4/2+lastPt.y*w4-2,4,4);
+
+            convertPts();
+        }
+
+        function reset() {
+            pts=[];
+            lastPt =null;
+            drawPts();
+        }
+
+        function undo() {
+            pts.pop();
+            lastPt = pts.length? pts[pts.length-1] : null;
+            drawPts();
+        }
+
+        function convertPts() {
+            var converted="";
+            if(pts.length>1){
+               /* if(!(lastPt.x==pts[0].x && lastPt.y== pts[0].y)) {
+                    lastPt = {x:pts[0].x,y:pts[0].y};
+                    pts.push(lastPt);
+                    drawPts();
+                }*/
+
+                
+                for (var i=0;i<pts.length;i++) {
+                    converted += parseInt(toBits(pts[i].x)+toBits(pts[i].y), 2).toString(16);
+                }
+
+                if(pts.length%1) converted += parseInt(toBits(pts[pts.length-1].x)+toBits(pts[pts.length-1].y), 2).toString(16);
+
+            }
+            document.getElementById("converted").textContent = converted;
+        }
+
+        function toBits(num) {
+            var num = num.toString(2);
+            while(num.length!=2) num = "0"+num;
+            return num;
+        }
+
+        reset();
+
+        canvas.addEventListener("click",function(e){
+            var x = Math.floor((e.clientX - canvas.offsetLeft)/w4);
+            var y = Math.floor((e.clientY - canvas.offsetTop)/w4);
+            if(lastPt && x==lastPt.x && y == lastPt.y) return;
+            lastPt = {x:x, y:y};
+            pts.push(lastPt);
+            drawPts();
+            if(pts.length>1 && lastPt.x==pts[0].x && lastPt.y== pts[0].y) convertPts();
+        })
+    </script>
+</body>
+</html>

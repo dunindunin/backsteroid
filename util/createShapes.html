@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Create Shapes</title>
+    <style>
+        html, body {
+            margin: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: black;
+        }
+        #code, canvas {
+            border: solid 1px lightgrey;
+        }
+        #code {
+            width:300px;
+            height: 600px;
+            background-color: white;
+        }
+        canvas {
+            margin: 0 20px;
+            cursor:crosshair;
+        }
+        #menu {
+            height: 300px;
+            display: flex;
+            flex-direction: column-reverse;
+        }
+        button {
+            display: block;
+            width: 100%;
+        }
+        p {margin:0;}
+    </style>
+</head>
+<body>
+    <img src="ref.jpg" style="display:none" id="ref"/>
+    <div id="menu">
+        <button type="button" onclick="end()">End Path</button> 
+        <button type="button" onclick="undo()">Undo</button>  
+        <button type="button" onclick="reset()">Reset</button> 
+        <button type="button" onclick="showHideRef()">Show / Hide Ref</button> 
+        
+           
+    </div>
+    <canvas id="points" width="600" height="600"></canvas>
+    <textarea id="code"></textarea>
+
+    <script>
+    var hideRef = false;
+    var code = document.getElementById("code");
+    var ref = document.getElementById("ref");
+        var canvas = document.getElementById("points");
+        var ctx = canvas.getContext("2d");
+        ctx.strokeStyle = "#fff";
+        ctx.font = "30px courrier";
+        var coor ={x:0,y:0};
+        var lastClick ={x:-10,y:-10};
+        shapes = [[]];
+
+        canvas.addEventListener("mousemove",(e)=>{
+            coor = {x:e.clientX - canvas.offsetLeft, y: e.clientY - canvas.offsetTop};
+            draw();
+        });
+
+        canvas.addEventListener("click",(e)=>{
+            lastClick = {x:e.clientX - canvas.offsetLeft, y: e.clientY - canvas.offsetTop};
+            shapes[shapes.length-1].push(lastClick);
+            draw();
+        });
+
+        code.addEventListener("keypress",(e)=>{
+            if(e.key == "Enter")  {
+                e.preventDefault();
+                loadFromText();
+            }
+        })
+
+        document.body.addEventListener("keyup",(e)=>{
+            if (e.target.id == "code") return;
+            // console.log(" no in code");
+            e.preventDefault();
+            switch(e.key){
+                case "ArrowLeft" : shapes.forEach((e)=>{e.forEach((f)=>{f.x =parseInt(f.x)-5})});break;
+                case "ArrowRight" : shapes.forEach((e)=>{e.forEach((f)=>{f.x =parseInt(f.x)+5})});break;
+                case "ArrowUp" : shapes.forEach((e)=>{e.forEach((f)=>{f.y =parseInt(f.y)-5})});break;
+                case "ArrowDown" : shapes.forEach((e)=>{e.forEach((f)=>{f.y =parseInt(f.y)+5})});break;
+
+            }
+
+            draw();
+        })
+
+        function showHideRef(){hideRef = !hideRef;draw();}
+
+        function draw() {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            if(!hideRef && ref) ctx.drawImage(ref,canvas.width/2-ref.naturalWidth/2,canvas.height/2-ref.naturalHeight/2);
+            ctx.fillStyle = "#fff";
+            var res = "";
+
+            shapes.forEach((s,id)=>{
+                ctx.beginPath();
+                res += ""
+                
+                s.forEach((pt,id)=>{
+                    if(id){
+                        ctx.lineTo(pt.x,pt.y);
+                        res +="/";
+                   } else ctx.moveTo(pt.x, pt.y);
+                    res += ""+pt.x+","+pt.y;
+                });
+                ctx.stroke();
+
+                res += "\n";
+            })
+
+            ctx.fillRect(lastClick.x-1,lastClick.y-1,2,2)
+
+            ctx.fillText("x : "+coor.x+" ; y : "+coor.y,40,40);
+
+            code.value = res;
+        }
+
+        function undo() {
+            var lastShape = shapes[shapes.length-1];
+            if(lastShape) {
+                lastShape.pop();
+                lastClick = lastShape.length? lastShape[lastShape.length-1]: {x:-10,y:-10};
+            }
+            draw();
+        }
+
+        function reset() {
+            shapes.pop();
+            if(shapes.length==0) shapes.push([]);
+            lastClick = {x:-10,y:-10};
+            draw();
+        }
+
+        function end() {
+            var lastShape = shapes[shapes.length-1];
+            if(lastShape.length>1) shapes.push([]);
+        }
+
+        function loadFromText() {
+            var txt = code.value;
+            shapes = txt.split("\n").map((shap)=>{
+                console.log("shap",shap);
+                shap = shap.split("/").map((el)=>{
+                    console.log("   el",el);
+                    return el.split(",").reduce((res,pt,id)=>{
+                        console.log("       pt",pt);
+                        if(id%2) res.y = pt;
+                        else res.x=pt;
+                        return res;
+                    },{})
+                })
+                console.log("shap end",shap);
+                return shap;
+            });
+            shapes.pop();
+            lastClick = {x:-10,y:-10};
+
+
+            draw();
+        }
+        
+        draw();
+    </script>
+</body>
+</html>
