@@ -300,6 +300,16 @@ function logicLoop() {
 		}
 
 		moveObj(o1);
+		// collision with other ships
+		for (var j=i+1;j<ships.length; j++) {
+			o2 = ships[j];
+			if(checkCollision(o1,o2)) {
+				killShip(o1);
+				killShip(o2);
+				createExplosion(o1,o2);
+				break;
+			}
+		}
 	}
 
 	for (var i=bulls.length-1;i>-1;i--) {
