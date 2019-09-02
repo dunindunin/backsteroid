@@ -18,9 +18,9 @@ function test() {
 }
 
 
-// for(var i=0;i<100;i++) {
+for(var i=0;i<100;i++) {
 	test();
-// }
+}
 console.log("storage.size()",storage.size());
 console.log("heroku",heroku);
 
