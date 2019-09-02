@@ -4,7 +4,7 @@ const nbMaxHigh = 99;
 const heroku = typeof process !== "undefined";
 let client;
 
-if(heroku) {
+/*if(heroku) {
 	console.log("heroku !");
 	const { Client } = require('pg');
 
@@ -12,16 +12,16 @@ if(heroku) {
 	  connectionString: process.env.DATABASE_URL,
 	  ssl: true,
 	});
-}
+}*/
 
 function test() {
 	checkHighscores([{newHighscore:true,name:generateID().slice(0,5),highscore:Math.floor(Math.random()*100000)}]);
 }
 
 
-for(var i=0;i<100;i++) {
+// for(var i=0;i<100;i++) {
 	test();
-}
+// }
 console.log("storage.size()",storage.size());
 console.log("heroku",heroku);
 
@@ -125,17 +125,17 @@ async function getSavedHigh(id) {
 	console.log("	getSavedHigh",id);
 	let saved=null;
 	if(id) {
-		if(heroku) {
+		/*if(heroku) {
 			// postgres
 			await client.connect()
 			const res = await client.query('SELECT score FROM highscoretab WHERE highscoreID = $1', [id]);
 			saved = res.rows.length? res.rows.score : null;
 			await client.end()
-		} else {
+		} else {*/
 			// sqlite
 			saved = await storage.get(id,null);
 			if(saved) saved = saved.score;
-		}
+		// }
 	}
 	console.log("		"+JSON.stringify(saved));
 	return saved;
@@ -152,12 +152,12 @@ async function saveHigh(ship) {
 
 	console.log ("		newID",newID);
 
-	if(heroku) {
+	/*if(heroku) {
 		// postgres
 		await client.connect()
 		await client.query('INSERT INTO highscoretab(highscoreID,name,score) VALUES($1,$2,$3)', [newID,ship.name,ship.highscore]);
 		await client.end();
-	} else {
+	} else {*/
 		// sqlite
 		console.log ("			sqlite save");
 		try{
@@ -165,7 +165,7 @@ async function saveHigh(ship) {
 		} catch(e) {console.log("set error",e)};
 		ship.highscoreID = newID;
 		console.log ("			end sqlite save");
-	}
+	// }
 	io.to(ship.id).emit("highscoreID",newID);
 	
 
@@ -177,15 +177,15 @@ async function saveHigh(ship) {
 async function removeHigh(id) {
 	console.log("remove id",id);
 	try{
-		if(heroku) {
+		/*if(heroku) {
 			// postgres
 			await client.connect();
 			await client.query('DELETE FROM highscoretab WHERE highscoreID = $1', [id]);
 			await client.end();
-		} else {
+		} else {*/
 			// sqlite
 				await storage.remove(id);
-		}
+		// }
 	} catch(e) {console.log("remove error",e)};
 }
 
@@ -197,7 +197,7 @@ function generateID() {
 
 async function checkNbHigh() {
 	console.log("		checkNbHigh");
-	if(heroku) {
+	/*if(heroku) {
 		// postgres
 		await client.connect();
 		let length = await client.query('SELECT COUNT(*) FROM highscoretab');
@@ -208,38 +208,38 @@ async function checkNbHigh() {
 			length = length.row[0].count;
 		}
 		await client.end();
-	} else {
+	} else {*/
 		// sqlite
 		storage.length().then(async (length)=>{
-			console.log("			storage length",length)
+			console.log("			storage length",length, "length>nbMaxHigh",length>nbMaxHigh)
 			while(length>nbMaxHigh) {
 				let minKey, minValue,score;
 				for(var i=0;i<length;i++) {
 					score = await storage.get(await storage.key(i));
-					// console.log("i",i,"await storage.key(i)",await storage.key(i),"score",score);
+					
 					if(minValue == undefined || minValue>score.score) {
 						minValue = score.score;
 						minKey = await storage.key(i);
 					}
 				}
-
+				// console.log("minValue",minValue,"minKey",minKey);
 				await removeHigh(minKey);
 				length = await storage.length();
 			}
 		})
-	}
+	// }
 }
 
 
 async function getLeaderBoard() {
 	let res;
-	if(heroku) {
+/*	if(heroku) {
 		// postgres
 		await client.connect();
 		res = await client.query('SELECT * FROM highscoretab');
 		await client.end();
 	} else {
-		// sqlite
+		// sqlite*/
 		res=[];
 		let el,key,length = await storage.length();
 		for(var i=0;i<length;i++) {
@@ -249,7 +249,7 @@ async function getLeaderBoard() {
 			res.push(el);
 		}
 		
-	}
+	// }
 	return res.sort((s1,s2)=>{
 			return s2.score - s1.score;
 		});
