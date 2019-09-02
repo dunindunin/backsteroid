@@ -576,7 +576,7 @@ function statLoop() {
 	}
 
 	if(keys.x) {
-		menuId = (menuId+1)%(leaderBoard?1+(leaderBoard.length/10)|1:1);
+		menuId = (menuId+1)%(leaderBoard?1+Math.ceil(leaderBoard.length/10):1);
 	}
 	if(keys.c) {
 		setTitle();
