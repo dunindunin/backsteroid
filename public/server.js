@@ -128,7 +128,7 @@ async function getSavedHigh(id) {
 		if(heroku) {
 			// postgres
 			await client.connect()
-			const res = await client.query('SELECT score FROM highscoreTab WHERE highscoreID = $1', [id]);
+			const res = await client.query('SELECT score FROM highscoretab WHERE highscoreID = $1', [id]);
 			saved = res.rows.length? res.rows.score : null;
 			await client.end()
 		} else {
@@ -155,7 +155,7 @@ async function saveHigh(ship) {
 	if(heroku) {
 		// postgres
 		await client.connect()
-		await client.query('INSERT INTO highscoreTab(highscoreID,name,score) VALUES($1,$2,$3)', [newID,ship.name,ship.highscore]);
+		await client.query('INSERT INTO highscoretab(highscoreID,name,score) VALUES($1,$2,$3)', [newID,ship.name,ship.highscore]);
 		await client.end();
 	} else {
 		// sqlite
@@ -164,9 +164,10 @@ async function saveHigh(ship) {
 			saved = await storage.set(newID,{"name":ship.name,"score":ship.highscore});
 		} catch(e) {console.log("set error",e)};
 		ship.highscoreID = newID;
+		console.log ("			end sqlite save");
 	}
 	io.to(ship.id).emit("highscoreID",newID);
-	console.log ("			end sqlite save");
+	
 
 	checkNbHigh();
 
@@ -179,7 +180,7 @@ async function removeHigh(id) {
 		if(heroku) {
 			// postgres
 			await client.connect();
-			await client.query('DELETE FROM highscoreTab WHERE highscoreID = $1', [id]);
+			await client.query('DELETE FROM highscoretab WHERE highscoreID = $1', [id]);
 			await client.end();
 		} else {
 			// sqlite
@@ -199,11 +200,11 @@ async function checkNbHigh() {
 	if(heroku) {
 		// postgres
 		await client.connect();
-		let length = await client.query('SELECT COUNT(*) FROM highscoreTab');
+		let length = await client.query('SELECT COUNT(*) FROM highscoretab');
 		length = length.row[0].count;
 		while (length>nbMaxHigh) {
-			await client.query('DELETE FROM highscoreTab WHERE score = (SELECT MIN(score) FROM highscoreTab )');
-			length = await client.query('SELECT COUNT(*) FROM highscoreTab');
+			await client.query('DELETE FROM highscoretab WHERE score = (SELECT MIN(score) FROM highscoretab )');
+			length = await client.query('SELECT COUNT(*) FROM highscoretab');
 			length = length.row[0].count;
 		}
 		await client.end();
@@ -235,7 +236,7 @@ async function getLeaderBoard() {
 	if(heroku) {
 		// postgres
 		await client.connect();
-		res = await client.query('SELECT * FROM highscoreTab');
+		res = await client.query('SELECT * FROM highscoretab');
 		await client.end();
 	} else {
 		// sqlite
