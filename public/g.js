@@ -236,7 +236,7 @@ function draw() {
 		drawThing(a);
 	});
 	ctx.stroke();
-	ctx.strokeText(currentFps||fps.getFPS(),10,10);
+	// ctx.strokeText(currentFps||fps.getFPS(),10,10);
 	// ctx.strokeText(JSON.stringify(keys),10,20);
 
 	ships.forEach(s=>{
