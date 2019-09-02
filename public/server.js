@@ -5,6 +5,7 @@ const heroku = typeof process !== "undefined";
 let client;
 
 if(heroku) {
+	console.log("heroku !");
 	const { Client } = require('pg');
 
 	client = new Client({
